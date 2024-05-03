@@ -57,12 +57,15 @@ func (this *RtmpServer) PushAvPacket(pkt av.Packet) error {
 	var xErr error
 
 	if pkt.IsVideo {
-		glog.InfoF("$$$$$PushAvPacket Video TimeMils=[%v]", pkt.TimeStamp)
+		glog.InfoF("$$$$$PushAvPacket Video Time Second=[%v]", float64(pkt.TimeStamp)/1000.0)
 	}
 
 	if pkt.IsAudio {
-		glog.InfoF("#####PushAvPacket Audio TimeMils=[%v]", pkt.TimeStamp)
+		glog.InfoF("#####PushAvPacket Audio Time Second=[%v]", float64(pkt.TimeStamp)/1000.0)
 	}
+
+	pktChanLen := len(this.mPktChan)
+	glog.InfoF("@@@@@pktChanLen=[%v]", pktChanLen)
 
 	this.mPktChan <- pkt
 

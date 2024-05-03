@@ -223,7 +223,21 @@ func (p *AvProcessor) initOutVideoStream() error {
 	stream.Codecpar.BitRate = 128 * 1024
 	stream.Codecpar.CodecTag = 0
 
-	outCodec := libavcodec.AvcodecFindEncoder(stream.Codecpar.CodecId)
+	//硬件编码
+	var outCodec *libavcodec.AVCodec
+
+	if outCodec == nil {
+		outCodec = libavcodec.AvcodecFindEncoderByName("h264_nvenc")
+	}
+
+	if outCodec == nil {
+		outCodec = libavcodec.AvcodecFindEncoderByName("h264_qsv")
+	}
+
+	if outCodec == nil {
+		outCodec = libavcodec.AvcodecFindEncoder(stream.Codecpar.CodecId)
+	}
+
 	if outCodec == nil {
 		xErr = fmt.Errorf("cannot find output video encoder")
 		return xErr

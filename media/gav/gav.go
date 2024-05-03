@@ -81,7 +81,25 @@ func NewAvCodecMeta(avstream *libavformat.AVStream) (*AvCodecMeta, error) {
 
 	pThis.StreamIndex = avstream.Index
 
-	pThis.Codec = libavcodec.AvcodecFindDecoder(avstream.Codecpar.CodecId)
+	xAvCodeId := avstream.Codecpar.CodecId
+
+	//硬件解码
+	if xAvCodeId == libavcodec.AV_CODEC_ID_H264 {
+
+		if pThis.Codec == nil {
+			pThis.Codec = libavcodec.AvcodecFindDecoderByName("h264_qsv")
+		}
+
+		if pThis.Codec == nil {
+			pThis.Codec = libavcodec.AvcodecFindDecoderByName("h264_cuvid")
+		}
+
+	}
+
+	if pThis.Codec == nil {
+		pThis.Codec = libavcodec.AvcodecFindDecoder(avstream.Codecpar.CodecId)
+	}
+
 	if pThis.Codec == nil {
 		xErr = fmt.Errorf("can not find stream decoder")
 		return nil, xErr
