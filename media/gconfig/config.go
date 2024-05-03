@@ -20,8 +20,8 @@ func GetTaskMeta(taskId string) TaskMeta {
 	taskData.VideoStreamType = "local"
 	taskData.VideoStreamPath = path.Join(glib.AppBaseDir(), "test.mp4")
 
-	taskData.DstVideoWidth = 1280
-	taskData.DstVideoHeight = 720
+	taskData.DstVideoWidth = 1080
+	taskData.DstVideoHeight = 1920
 
 	return taskData
 

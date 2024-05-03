@@ -9,6 +9,7 @@ import (
 	"github.com/chwjbn/live-hub/media/grtmp"
 	"github.com/moonfdd/ffmpeg-go/ffcommon"
 	"github.com/moonfdd/ffmpeg-go/libavcodec"
+	"github.com/moonfdd/ffmpeg-go/libavfilter"
 	"github.com/moonfdd/ffmpeg-go/libavformat"
 	"github.com/moonfdd/ffmpeg-go/libavutil"
 	"github.com/moonfdd/ffmpeg-go/libswresample"
@@ -34,6 +35,11 @@ type AvProcessor struct {
 	mInAudioCodecMeta *AvCodecMeta
 
 	mInVideoRotate int
+
+	mAvFilterSrcCtx    *libavfilter.AVFilterContext
+	mAvFilterSlinkCtx  *libavfilter.AVFilterContext
+	mAvFilterRotateCtx *libavfilter.AVFilterContext
+	mAvFilterGraph     *libavfilter.AVFilterGraph
 
 	mAudioSwrContext *libswresample.SwrContext
 	mAudioFifo       *libavutil.AVAudioFifo
@@ -196,6 +202,91 @@ func (p *AvProcessor) InitInputStream() error {
 	glog.InfoF("file path=[%v] timeSecTotal=[%v]s", filePath, timeSecTotal)
 
 	return xErr
+}
+
+func (p *AvProcessor) initInputFilter() error {
+
+	var xErr error
+
+	p.mAvFilterGraph = libavfilter.AvfilterGraphAlloc()
+	if p.mAvFilterGraph == nil {
+		xErr = fmt.Errorf("alloc filter graph faild")
+		return xErr
+	}
+
+	xFilterSrc := libavfilter.AvfilterGetByName("buffer")
+	if xFilterSrc == nil {
+		xErr = fmt.Errorf("get filter=[buffer] faild")
+		return xErr
+	}
+
+	xFilterSink := libavfilter.AvfilterGetByName("buffersink")
+	if xFilterSink == nil {
+		xErr = fmt.Errorf("get filter=[buffersink] faild")
+		return xErr
+	}
+
+	xFilterRotate := libavfilter.AvfilterGetByName("transpose")
+	if xFilterRotate == nil {
+		xErr = fmt.Errorf("get filter=[transpose] faild")
+		return xErr
+	}
+
+	var res ffcommon.FInt
+
+	//创建输入filter
+	xVideoTimeBase := p.mInFmtCtx.GetStream(ffcommon.FUnsignedInt(p.mInVideoCodecMeta.StreamIndex)).TimeBase
+
+	xVideoArgs := fmt.Sprintf("video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
+		p.mInVideoCodecMeta.CodecCtx.Width,
+		p.mInVideoCodecMeta.CodecCtx.Height,
+		23,
+		xVideoTimeBase.Num,
+		xVideoTimeBase.Den,
+		p.mInVideoCodecMeta.CodecCtx.SampleAspectRatio.Num,
+		p.mInVideoCodecMeta.CodecCtx.SampleAspectRatio.Den,
+	)
+
+	res = libavfilter.AvfilterGraphCreateFilter(&p.mAvFilterSrcCtx, xFilterSrc, "in", xVideoArgs, 0, p.mAvFilterGraph)
+	if res < 0 {
+		xErr = fmt.Errorf("create filter=[in] faild")
+		return xErr
+	}
+
+	//创建输出filter
+	res = libavfilter.AvfilterGraphCreateFilter(&p.mAvFilterSlinkCtx, xFilterSink, "out", "", 0, p.mAvFilterGraph)
+	if res < 0 {
+		xErr = fmt.Errorf("create filter=[out] faild")
+		return xErr
+	}
+
+	res = libavfilter.AvfilterGraphCreateFilter(&p.mAvFilterRotateCtx, xFilterRotate, "transpose", "1", 0, p.mAvFilterGraph)
+	if res < 0 {
+		xErr = fmt.Errorf("create filter=[transpose] faild")
+		return xErr
+	}
+
+	//链接滤镜
+	res = p.mAvFilterSrcCtx.AvfilterLink(0, p.mAvFilterRotateCtx, 0)
+	if res < 0 {
+		xErr = fmt.Errorf("link filter=[src] with [transpose] faild")
+		return xErr
+	}
+
+	res = p.mAvFilterRotateCtx.AvfilterLink(0, p.mAvFilterSlinkCtx, 0)
+	if res < 0 {
+		xErr = fmt.Errorf("link filter=[transpose] with [out] faild")
+		return xErr
+	}
+
+	res = p.mAvFilterGraph.AvfilterGraphConfig(0)
+	if res < 0 {
+		xErr = fmt.Errorf("config filter graph faild")
+		return xErr
+	}
+
+	return xErr
+
 }
 
 func (p *AvProcessor) initOutVideoStream() error {
@@ -464,6 +555,9 @@ func (p *AvProcessor) RunProccess() error {
 	var avFrame *libavformat.AVFrame
 	avFrame = libavutil.AvFrameAlloc()
 
+	var avFilterFrame *libavformat.AVFrame
+	avFilterFrame = libavutil.AvFrameAlloc()
+
 	defer func() {
 		libavutil.AvFrameFree(&avFrame)
 		avPkt.AvFreePacket()
@@ -498,6 +592,29 @@ func (p *AvProcessor) RunProccess() error {
 					res = p.mInVideoCodecMeta.CodecCtx.AvcodecReceiveFrame(avFrame)
 					if res < 0 {
 						break
+					}
+
+					if p.mAvFilterGraph == nil {
+						p.initInputFilter()
+					}
+
+					if p.mInVideoRotate > 0 {
+
+						res = p.mAvFilterSrcCtx.AvBuffersrcAddFrame(avFrame)
+						if res < 0 {
+							break
+						}
+
+						for {
+							res = p.mAvFilterSlinkCtx.AvBuffersinkGetFrame(avFilterFrame)
+							if res < 0 {
+								break
+							}
+
+							p.processVideoFrame(p.mInFmtCtx, p.mInVideoCodecMeta, avFilterFrame)
+						}
+
+						continue
 					}
 
 					p.processVideoFrame(p.mInFmtCtx, p.mInVideoCodecMeta, avFrame)
