@@ -209,9 +209,12 @@ func (p *AvProcessor) processAudioFrame(fmtCtx *libavformat.AVFormatContext, src
 
 	for {
 
-		if outDataBuffer != nil {
-			libavutil.AvFreep(uintptr(unsafe.Pointer(outDataBuffer)))
+		if outDataBuffer == nil {
+			glog.WarnF("outDataBuffer is nil before process")
+			break
 		}
+
+		libavutil.AvFreep(uintptr(unsafe.Pointer(outDataBuffer)))
 
 		res = libavutil.AvSamplesAlloc(outDataBuffer, &outDataLineSize, outChannels, maxOutNbSamples, libavutil.AVSampleFormat(outFormat), 1)
 		if res < 0 {
