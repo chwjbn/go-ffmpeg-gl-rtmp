@@ -8,7 +8,6 @@ import (
 	"github.com/moonfdd/ffmpeg-go/libavutil"
 	"github.com/moonfdd/ffmpeg-go/libswscale"
 	"image"
-	"runtime"
 	"unsafe"
 )
 
@@ -171,12 +170,9 @@ func (p *AvProcessor) processAudioFrame(fmtCtx *libavformat.AVFormatContext, src
 	defer func() {
 
 		if outDataBuffer != nil {
-
 			libavutil.AvFreep(uintptr(unsafe.Pointer(outDataBuffer)))
-			libavutil.AvFreep(uintptr(unsafe.Pointer(&outDataBuffer)))
-
-			outDataBuffer = nil
 		}
+		libavutil.AvFreep(uintptr(unsafe.Pointer(&outDataBuffer)))
 
 		if dstFrame != nil {
 			libavutil.AvFrameFree(&dstFrame)
@@ -211,11 +207,12 @@ func (p *AvProcessor) processAudioFrame(fmtCtx *libavformat.AVFormatContext, src
 	inDataAddr := srcFrame.ExtendedData
 	inDataCount := srcFrame.NbSamples
 
-	runtime.LockOSThread()
-
 	for {
 
-		libavutil.AvFreep(uintptr(unsafe.Pointer(outDataBuffer)))
+		if outDataBuffer != nil {
+			libavutil.AvFreep(uintptr(unsafe.Pointer(outDataBuffer)))
+		}
+
 		res = libavutil.AvSamplesAlloc(outDataBuffer, &outDataLineSize, outChannels, maxOutNbSamples, libavutil.AVSampleFormat(outFormat), 1)
 		if res < 0 {
 			break
@@ -231,14 +228,14 @@ func (p *AvProcessor) processAudioFrame(fmtCtx *libavformat.AVFormatContext, src
 			break
 		}
 
-		//溢出了
-		if xConvertNbSamples > maxOutNbSamples {
-			glog.WarnF("!!!!!xConvertNbSamples=[%v] maxOutNbSamples=[%v]", xConvertNbSamples, maxOutNbSamples)
-			xConvertNbSamples = maxOutNbSamples
-		}
-
 		inDataAddr = (**ffcommon.FUint8T)(unsafe.Pointer(uintptr(0)))
 		inDataCount = 0
+
+		//可能为空
+		if outDataBuffer == nil {
+			glog.WarnF("outDataBuffer is nil after SwrConvert")
+			break
+		}
 
 		res = p.mAudioFifo.AvAudioFifoWrite((*ffcommon.FVoidP)(unsafe.Pointer(outDataBuffer)), xConvertNbSamples)
 		if res <= 0 {
