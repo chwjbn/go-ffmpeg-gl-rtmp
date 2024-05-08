@@ -93,24 +93,24 @@ func (e *EffectProcessor) initData() error {
 
 	e.mVertices = []float32{
 		// top left
-		-1.0 * -1.0, -1.0 * 1.0, 0.0, // position
+		-1.0 * -1.0, 1.0, 0.0, // position
 		1.0, 0.0, 0.0, // Color
-		1.0, 0.0, // texture coordinates
+		0.0, 1.0, // texture coordinates
 
 		// top right
-		-1.0 * 1.0, -1.0 * 1.0, 0.0,
+		-1.0 * 1.0, 1.0, 0.0,
 		0.0, 1.0, 0.0,
-		0.0, 0.0,
+		1.0, 1.0,
 
 		// bottom right
-		-1.0 * 1.0, -1.0 * -1.0, 0.0,
+		-1.0 * 1.0, -1.0, 0.0,
 		0.0, 0.0, 1.0,
-		0.0, 1.0,
+		1.0, 0.0,
 
 		// bottom left
-		-1.0 * -1.0, -1.0 * -1.0, 0.0,
+		-1.0 * -1.0, -1.0, 0.0,
 		1.0, 1.0, 1.0,
-		1.0, 1.0,
+		0.0, 0.0,
 	}
 
 	e.mIndices = []uint32{
@@ -220,6 +220,8 @@ func (e *EffectProcessor) initOpenGL() error {
 		xErr = fmt.Errorf("gl.Init error:[%v]", glErr.Error())
 		return xErr
 	}
+
+	gl.Enable(gl.FRAMEBUFFER_SRGB)
 
 	gl.Viewport(0, 0, int32(e.mWidth), int32(e.mHeight))
 	gl.ClearColor(0, 0, 0, 1)
