@@ -93,22 +93,22 @@ func (e *EffectProcessor) initData() error {
 
 	e.mVertices = []float32{
 		// top left
-		-1.0 * -1.0, 1.0, 0.0, // position
+		-1.0, 1.0, 0.0, // position
 		1.0, 0.0, 0.0, // Color
 		0.0, 1.0, // texture coordinates
 
 		// top right
-		-1.0 * 1.0, 1.0, 0.0,
+		1.0, 1.0, 0.0,
 		0.0, 1.0, 0.0,
 		1.0, 1.0,
 
 		// bottom right
-		-1.0 * 1.0, -1.0, 0.0,
+		1.0, -1.0, 0.0,
 		0.0, 0.0, 1.0,
 		1.0, 0.0,
 
 		// bottom left
-		-1.0 * -1.0, -1.0, 0.0,
+		-1.0, -1.0, 0.0,
 		1.0, 1.0, 1.0,
 		0.0, 0.0,
 	}
